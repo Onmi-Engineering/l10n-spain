@@ -12,15 +12,29 @@ para el detalle de cada uno de estos tres problemas.
 """
 
 
+def _table_exists(cr, table_name):
+    cr.execute("SELECT to_regclass(%s)", (table_name,))
+    return cr.fetchone()[0] is not None
+
+
 def migrate(cr, version):
     # (1) mapas AEAT que solapan entre datos v15 y los CSV v19 (choca al
     # cargar cualquier mod1xx, ej. mod123: "The dates of the record overlap
-    # with an existing record.").
+    # with an existing record."). Se chequea que cada tabla exista antes de
+    # tocarla: el pre-migrate corre ANTES de que Odoo cree/actualice el
+    # esquema, así que alguna de estas puede no existir todavía en esta
+    # base puntual (ej. si es una tabla nueva de v19 o si nunca se llegó a
+    # crear en v15 por no tener datos).
+    for table in (
+        "l10n_es_aeat_map_tax_line_tax",
+        "l10n_es_aeat_map_tax_line",
+        "l10n_es_aeat_map_tax",
+    ):
+        if _table_exists(cr, table):
+            cr.execute("DELETE FROM %s" % table)  # noqa: S608 (nombre fijo, no input externo)
+
     cr.execute(
         """
-        DELETE FROM l10n_es_aeat_map_tax_line_tax;
-        DELETE FROM l10n_es_aeat_map_tax_line;
-        DELETE FROM l10n_es_aeat_map_tax;
         DELETE FROM ir_model_data WHERE model IN (
             'l10n.es.aeat.map.tax',
             'l10n.es.aeat.map.tax.line',
