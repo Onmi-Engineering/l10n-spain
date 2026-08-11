@@ -468,6 +468,14 @@ class AccountMove(models.Model):
 
     def _sii_invoice_dict_not_modified(self):
         self.ensure_one()
+        # MTEPRETTI (migración invermed v15->19): aeat_content_sent quedó
+        # vacío (False) para ~7900 facturas ya enviadas al SII antes de la
+        # migración (no se puede reconstruir el contenido histórico real
+        # enviado a la AEAT). Sin nada con qué comparar, se asume que "sí
+        # cambió" -> sigue el flujo normal de reenvío al SII en vez de
+        # crashear con json.loads(False).
+        if not self.aeat_content_sent:
+            return False
         to_send = self._get_aeat_invoice_dict()
         content_sent = json.loads(self.aeat_content_sent)
         return to_send == content_sent
